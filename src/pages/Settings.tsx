@@ -1,190 +1,324 @@
-import React, { useState } from 'react';
-import { 
-  Settings as SettingsIcon, 
-  Bell, 
-  Shield, 
-  Globe, 
-  Smartphone, 
-  Mail, 
-  Save, 
-  CheckCircle2,
-  Building2,
-  Palette,
-  Database,
-  Lock,
-  Loader2
-} from 'lucide-react';
-import { cn } from '../components/Badges';
+import { useEffect, useState } from 'react';
+import { Save, Building2, Mail, Phone, MapPin, Clock, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import type { ClinicSettings } from '../types';
 
-export function Settings() {
-  const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState('general');
+type FormState = {
+  clinic_name: string;
+  clinic_email: string;
+  clinic_phone: string;
+  clinic_address: string;
+  default_sla_hours: number;
+};
 
-  const handleSave = () => {
-    setLoading(true);
-    setTimeout(() => {
+const DEFAULTS: FormState = {
+  clinic_name: '',
+  clinic_email: '',
+  clinic_phone: '',
+  clinic_address: '',
+  default_sla_hours: 24,
+};
+
+type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+
+export default function Settings() {
+  const [form, setForm] = useState<FormState>(DEFAULTS);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // ─── Carregar configurações ao montar ──────────────────────
+  useEffect(() => {
+    async function loadSettings() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('clinic_settings')
+        .select('*')
+        .maybeSingle();
+
+      if (error) {
+        console.error('[Settings] Erro ao carregar configurações:', error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        setSettingsId(data.id);
+        setForm({
+          clinic_name: data.clinic_name ?? '',
+          clinic_email: data.clinic_email ?? '',
+          clinic_phone: data.clinic_phone ?? '',
+          clinic_address: data.clinic_address ?? '',
+          default_sla_hours: data.default_sla_hours ?? 24,
+        });
+      }
       setLoading(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }, 1500);
-  };
+    }
 
-  const tabs = [
-    { id: 'general', label: 'Geral', icon: SettingsIcon },
-    { id: 'notifications', label: 'Notificações', icon: Bell },
-    { id: 'security', label: 'Segurança', icon: Shield },
-    { id: 'appearance', label: 'Aparência', icon: Palette },
-    { id: 'integrations', label: 'Integrações', icon: Globe },
-  ];
+    loadSettings();
+  }, []);
+
+  // ─── Handler de campo ────────────────────────────────────────
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) {
+    const { name, value, type } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : value,
+    }));
+    // Limpar feedback ao editar
+    if (saveStatus !== 'idle') setSaveStatus('idle');
+  }
+
+  // ─── Salvar no Supabase ───────────────────────────────────────
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaveStatus('saving');
+    setErrorMessage('');
+
+    // Validações básicas
+    if (!form.clinic_name.trim()) {
+      setSaveStatus('error');
+      setErrorMessage('O nome da clínica é obrigatório.');
+      return;
+    }
+    if (form.default_sla_hours < 1 || form.default_sla_hours > 720) {
+      setSaveStatus('error');
+      setErrorMessage('O SLA padrão deve ser entre 1 e 720 horas.');
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const payload: Partial<ClinicSettings> = {
+      clinic_name: form.clinic_name.trim(),
+      clinic_email: form.clinic_email.trim() || null,
+      clinic_phone: form.clinic_phone.trim() || null,
+      clinic_address: form.clinic_address.trim() || null,
+      default_sla_hours: form.default_sla_hours,
+      updated_by: session?.user?.id ?? null,
+    };
+
+    let error: any;
+
+    if (settingsId) {
+      // Atualizar linha existente
+      const result = await supabase
+        .from('clinic_settings')
+        .update(payload)
+        .eq('id', settingsId);
+      error = result.error;
+    } else {
+      // Inserir linha inicial (nunca deve acontecer se a migration rodou,
+      // mas é um fallback seguro)
+      const result = await supabase
+        .from('clinic_settings')
+        .insert(payload)
+        .select('id')
+        .single();
+      error = result.error;
+      if (!error && result.data) {
+        setSettingsId(result.data.id);
+      }
+    }
+
+    if (error) {
+      console.error('[Settings] Erro ao salvar:', error.message);
+      setSaveStatus('error');
+      setErrorMessage(error.message ?? 'Erro desconhecido ao salvar.');
+      return;
+    }
+
+    setSaveStatus('success');
+    // Limpar feedback de sucesso após 3s
+    setTimeout(() => setSaveStatus('idle'), 3000);
+  }
+
+  // ─── Render ───────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-3 text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Carregando configurações...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Configurações do <span className="text-blue-600">Sistema</span></h1>
-          <p className="text-gray-500 font-medium mt-1">Personalize o ClinicOps para atender às necessidades do seu hospital.</p>
-        </div>
-        <button 
-          onClick={handleSave}
-          disabled={loading}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-900/20 active:scale-95 disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="animate-spin" size={18} /> : saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
-          {loading ? 'SALVANDO...' : saved ? 'SALVO COM SUCESSO' : 'SALVAR ALTERAÇÕES'}
-        </button>
+    <div className="max-w-2xl mx-auto py-8 px-4">
+      {/* Cabeçalho */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Informações gerais da clínica e parâmetros do sistema.
+        </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Tabs */}
-        <div className="lg:w-64 space-y-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all",
-                activeTab === tab.id 
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20" 
-                  : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-100"
-              )}
-            >
-              <tab.icon size={18} />
-              {tab.label}
-            </button>
-          ))}
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* Card: Dados da Clínica */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-blue-600" />
+            Dados da Clínica
+          </h2>
+
+          <div className="space-y-4">
+            {/* Nome */}
+            <div>
+              <label
+                htmlFor="clinic_name"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Nome da clínica / hospital <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="clinic_name"
+                name="clinic_name"
+                type="text"
+                required
+                value={form.clinic_name}
+                onChange={handleChange}
+                placeholder="Ex: Hospital São Lucas"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* E-mail */}
+            <div>
+              <label
+                htmlFor="clinic_email"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                <Mail className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+                E-mail de contato
+              </label>
+              <input
+                id="clinic_email"
+                name="clinic_email"
+                type="email"
+                value={form.clinic_email}
+                onChange={handleChange}
+                placeholder="contato@hospital.com.br"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Telefone */}
+            <div>
+              <label
+                htmlFor="clinic_phone"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                <Phone className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+                Telefone
+              </label>
+              <input
+                id="clinic_phone"
+                name="clinic_phone"
+                type="tel"
+                value={form.clinic_phone}
+                onChange={handleChange}
+                placeholder="(11) 3000-0000"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Endereço */}
+            <div>
+              <label
+                htmlFor="clinic_address"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                <MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+                Endereço
+              </label>
+              <input
+                id="clinic_address"
+                name="clinic_address"
+                type="text"
+                value={form.clinic_address}
+                onChange={handleChange}
+                placeholder="Rua das Flores, 100 — São Paulo, SP"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 bg-white rounded-[32px] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden">
-          <div className="p-8 border-b border-gray-50">
-            <h3 className="text-xl font-black text-gray-900 tracking-tight">
-              {tabs.find(t => t.id === activeTab)?.label}
-            </h3>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
-              Gerencie as configurações de {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}
+        {/* Card: Parâmetros do Sistema */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-600" />
+            Parâmetros do Sistema
+          </h2>
+
+          <div>
+            <label
+              htmlFor="default_sla_hours"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              SLA padrão (horas) <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="default_sla_hours"
+              name="default_sla_hours"
+              type="number"
+              min={1}
+              max={720}
+              required
+              value={form.default_sla_hours}
+              onChange={handleChange}
+              className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Prazo padrão para resolução de ordens de serviço quando nenhum prazo específico é
+              definido (1–720h).
             </p>
           </div>
-
-          <div className="p-8 space-y-8">
-            {activeTab === 'general' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Hospital / Unidade</label>
-                    <div className="relative">
-                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                      <input 
-                        type="text" 
-                        defaultValue="Hospital Central ClinicOps"
-                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold text-gray-700"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CNPJ</label>
-                    <input 
-                      type="text" 
-                      defaultValue="00.000.000/0001-00"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold text-gray-700"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail de Suporte Técnico</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input 
-                      type="email" 
-                      defaultValue="suporte@clinicops.com.br"
-                      className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold text-gray-700"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-4">
-                    <Database className="text-blue-600 shrink-0" size={24} />
-                    <div>
-                      <h4 className="text-sm font-black text-blue-900">Armazenamento de Dados</h4>
-                      <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                        Seus dados estão sendo armazenados em servidores de alta performance com backup automático a cada 24 horas.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'notifications' && (
-              <div className="space-y-6">
-                <NotificationToggle title="Alertas de OS Crítica" description="Receber notificações imediatas para chamados de prioridade crítica." defaultChecked />
-                <NotificationToggle title="Atualização de Status" description="Notificar o solicitante quando o status da OS for alterado." defaultChecked />
-                <NotificationToggle title="Relatórios Semanais" description="Enviar resumo de produtividade por e-mail toda segunda-feira." />
-                <NotificationToggle title="Alertas de WhatsApp" description="Integrar notificações via WhatsApp para técnicos de plantão." />
-              </div>
-            )}
-
-            {activeTab === 'security' && (
-              <div className="space-y-6">
-                <div className="p-6 border border-gray-100 rounded-2xl space-y-4">
-                  <div className="flex items-center gap-3 text-rose-600">
-                    <Lock size={20} />
-                    <h4 className="text-sm font-black uppercase tracking-wider">Políticas de Senha</h4>
-                  </div>
-                  <p className="text-xs text-gray-500 font-medium">Configure as exigências mínimas para as senhas dos colaboradores.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer">
-                      <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="text-xs font-bold text-gray-700">Mínimo 8 caracteres</span>
-                    </label>
-                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer">
-                      <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="text-xs font-bold text-gray-700">Letras e números</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function NotificationToggle({ title, description, defaultChecked }: any) {
-  return (
-    <div className="flex items-center justify-between p-4 bg-gray-50/50 border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all">
-      <div className="space-y-1">
-        <h4 className="text-sm font-black text-gray-900">{title}</h4>
-        <p className="text-xs text-gray-500 font-medium">{description}</p>
-      </div>
-      <label className="relative inline-flex items-center cursor-pointer">
-        <input type="checkbox" defaultChecked={defaultChecked} className="sr-only peer" />
-        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-      </label>
+        {/* Feedback de status */}
+        {saveStatus === 'success' && (
+          <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            Configurações salvas com sucesso.
+          </div>
+        )}
+
+        {saveStatus === 'error' && (
+          <div className="flex items-center gap-2 text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {errorMessage || 'Erro ao salvar. Tente novamente.'}
+          </div>
+        )}
+
+        {/* Botão de salvar */}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={saveStatus === 'saving'}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {saveStatus === 'saving' ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Salvar configurações
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
