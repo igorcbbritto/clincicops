@@ -10,7 +10,7 @@ import { LoginPage } from './pages/LoginPage';
 import { Users as UsersPage } from './pages/Users';
 import { SectorDashboard } from './pages/SectorDashboard';
 import { Reports } from './pages/Reports';
-import { Settings } from './pages/Settings';
+import Settings from './pages/Settings';
 import { Equipments } from './pages/Equipments';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NewOSModal } from './components/NewOSModal';
@@ -173,8 +173,6 @@ function MainLayout({ children }: { children: React.ReactNode }) {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onSuccess={() => {
-          // Instead of full reload, we can just close and the user will see the update if they are on a list
-          // Or we can use a small delay before reload to ensure DB consistency
           setTimeout(() => {
             window.location.reload();
           }, 500);
@@ -184,125 +182,142 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Placeholder for other pages
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4 animate-in zoom-in-95 duration-500">
-    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 border border-blue-100">
-      <span className="text-2xl font-black italic">H</span>
-    </div>
-    <div>
-      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-      <p className="text-sm text-gray-500 mt-1">Este módulo está sendo preparado para o ambiente hospitalar.</p>
-    </div>
-    <button className="px-6 py-2 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg active:scale-95">
-      Voltar ao Início
-    </button>
-  </div>
-);
-
 export default function App() {
   return (
     <ErrorBoundary>
       <Router>
         <Routes>
-        {/* Auth Route */}
-        <Route path="/login" element={<LoginPage />} />
-        
-        {/* Protected App Routes */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
-        <Route path="/dashboard" element={
-          <AuthGuard>
-            <MainLayout>
-              <Dashboard />
-            </MainLayout>
-          </AuthGuard>
-        } />
-        
-        <Route path="/ordens-servico" element={
-          <AuthGuard>
-            <MainLayout>
-              <OSList />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          {/* Auth Route */}
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Protected App Routes */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          <Route
+            path="/dashboard"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/ordens-servico/nova" element={
-          <AuthGuard>
-            <MainLayout>
-              <CreateOS />
-            </MainLayout>
-          </AuthGuard>
-        } />
-        
-        <Route path="/ordens-servico/:id" element={
-          <AuthGuard>
-            <MainLayout>
-              <OSDetail />
-            </MainLayout>
-          </AuthGuard>
-        } />
-        
-        <Route path="/equipamentos" element={
-          <AuthGuard>
-            <MainLayout>
-              <SectorDashboard title="Engenharia Clínica" sectorType="ENG_CLINICA" />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/ordens-servico"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <OSList />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/ti" element={
-          <AuthGuard>
-            <MainLayout>
-              <SectorDashboard title="Tecnologia da Informação" sectorType="TI" />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/ordens-servico/nova"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <CreateOS />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
+          
+          <Route
+            path="/ordens-servico/:id"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <OSDetail />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
+          
+          <Route
+            path="/equipamentos"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <SectorDashboard title="Engenharia Clínica" sectorType="ENG_CLINICA" />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/manutencao" element={
-          <AuthGuard>
-            <MainLayout>
-              <SectorDashboard title="Manutenção Predial" sectorType="MANUTENCAO" />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/ti"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <SectorDashboard title="Tecnologia da Informação" sectorType="TI" />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/relatorios" element={
-          <AuthGuard>
-            <MainLayout>
-              <Reports />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/manutencao"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <SectorDashboard title="Manutenção Predial" sectorType="MANUTENCAO" />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/usuarios" element={
-          <AuthGuard>
-            <MainLayout>
-              <UsersPage />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/relatorios"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <Reports />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/configuracoes" element={
-          <AuthGuard>
-            <MainLayout>
-              <Settings />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/usuarios"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <UsersPage />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        <Route path="/inventario" element={
-          <AuthGuard>
-            <MainLayout>
-              <Equipments />
-            </MainLayout>
-          </AuthGuard>
-        } />
+          <Route
+            path="/configuracoes"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <Settings />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Router>
+          <Route
+            path="/inventario"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <Equipments />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Router>
     </ErrorBoundary>
   );
 }
