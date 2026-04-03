@@ -28,7 +28,6 @@ export default function Settings() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // ─── Carregar configurações ao montar ──────────────────────
   useEffect(() => {
     async function loadSettings() {
       setLoading(true);
@@ -53,37 +52,37 @@ export default function Settings() {
           default_sla_hours: data.default_sla_hours ?? 24,
         });
       }
+
       setLoading(false);
     }
 
     loadSettings();
   }, []);
 
-  // ─── Handler de campo ────────────────────────────────────────
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) {
     const { name, value, type } = e.target;
+
     setForm((prev) => ({
       ...prev,
       [name]: type === 'number' ? Number(value) : value,
     }));
-    // Limpar feedback ao editar
+
     if (saveStatus !== 'idle') setSaveStatus('idle');
   }
 
-  // ─── Salvar no Supabase ───────────────────────────────────────
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaveStatus('saving');
     setErrorMessage('');
 
-    // Validações básicas
     if (!form.clinic_name.trim()) {
       setSaveStatus('error');
       setErrorMessage('O nome da clínica é obrigatório.');
       return;
     }
+
     if (form.default_sla_hours < 1 || form.default_sla_hours > 720) {
       setSaveStatus('error');
       setErrorMessage('O SLA padrão deve ser entre 1 e 720 horas.');
@@ -106,21 +105,21 @@ export default function Settings() {
     let error: any;
 
     if (settingsId) {
-      // Atualizar linha existente
       const result = await supabase
         .from('clinic_settings')
         .update(payload)
         .eq('id', settingsId);
+
       error = result.error;
     } else {
-      // Inserir linha inicial (nunca deve acontecer se a migration rodou,
-      // mas é um fallback seguro)
       const result = await supabase
         .from('clinic_settings')
         .insert(payload)
         .select('id')
         .single();
+
       error = result.error;
+
       if (!error && result.data) {
         setSettingsId(result.data.id);
       }
@@ -134,11 +133,9 @@ export default function Settings() {
     }
 
     setSaveStatus('success');
-    // Limpar feedback de sucesso após 3s
     setTimeout(() => setSaveStatus('idle'), 3000);
   }
 
-  // ─── Render ───────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -152,7 +149,6 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
-      {/* Cabeçalho */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -161,7 +157,6 @@ export default function Settings() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Card: Dados da Clínica */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
             <Building2 className="w-4 h-4 text-blue-600" />
@@ -169,7 +164,6 @@ export default function Settings() {
           </h2>
 
           <div className="space-y-4">
-            {/* Nome */}
             <div>
               <label
                 htmlFor="clinic_name"
@@ -189,7 +183,6 @@ export default function Settings() {
               />
             </div>
 
-            {/* E-mail */}
             <div>
               <label
                 htmlFor="clinic_email"
@@ -209,7 +202,6 @@ export default function Settings() {
               />
             </div>
 
-            {/* Telefone */}
             <div>
               <label
                 htmlFor="clinic_phone"
@@ -229,7 +221,6 @@ export default function Settings() {
               />
             </div>
 
-            {/* Endereço */}
             <div>
               <label
                 htmlFor="clinic_address"
@@ -251,7 +242,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Card: Parâmetros do Sistema */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
             <Clock className="w-4 h-4 text-blue-600" />
@@ -283,7 +273,6 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Feedback de status */}
         {saveStatus === 'success' && (
           <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
@@ -298,7 +287,6 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Botão de salvar */}
         <div className="flex justify-end">
           <button
             type="submit"
