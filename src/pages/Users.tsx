@@ -72,7 +72,7 @@ export function Users() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sessão expirada');
 
-      const response = await fetch('/delete-user', {
+      const response = await fetch('/api/delete-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +113,7 @@ export function Users() {
         ? newUserData.email 
         : `${newUserData.email.toLowerCase().trim()}@clinicops.local`;
 
-      const response = await fetch('/create-user-v2', {
+      const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
